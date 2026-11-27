@@ -48,8 +48,8 @@ PC Windows                                        VM du cœur 5G (192.168.56.40)
 | Brique | Contenu | État |
 | --- | --- | --- |
 | 1 | Structure du dépôt, environnement Python | fait |
-| 2 | Serveur MCP minimal (outil `etat_reseau`) | en cours |
-| 3 | Appel au LLM local (Ollama) | à faire |
+| 2 | Serveur MCP minimal (outil `etat_reseau`) | fait |
+| 3 | Appel au LLM local (Ollama) | en cours |
 | 4 | Agent minimal : LLM + outil MCP | à faire |
 | 5 | Outils d'enquête : historique, événements, journaux | à faire |
 | 6 | RAG : base de connaissances 5G / NWDAF | à faire |
@@ -76,3 +76,13 @@ bash ~/Agent-IA-NWDAF-MCP/serveur-mcp/installer.sh        # une seule fois
 bash ~/Agent-IA-NWDAF-MCP/serveur-mcp/demarrer.sh         # --redemarrer après une mise à jour
 ```
 Test depuis Windows : `python agent/tester_mcp.py` (liste les outils et appelle `etat_reseau`).
+
+## LLM local (Windows)
+
+```powershell
+ollama pull qwen2.5:7b                 # modèle principal (environ 4,7 Go)
+ollama pull qwen2.5:3b                 # modèle léger, plus rapide
+python agent/tester_llm.py             # question simple + mesure de vitesse
+python agent/tester_llm.py qwen2.5:3b
+```
+`agent/ollama_local.py` appelle l'API HTTP d'Ollama (`/api/chat`, `/api/embed`) sans bibliothèque externe.
