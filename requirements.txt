@@ -1,0 +1,2 @@
+# SDK officiel du Model Context Protocol (client côté Windows, serveur côté VM du cœur)
+mcp>=2.3,<3
