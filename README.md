@@ -49,8 +49,8 @@ PC Windows                                        VM du cœur 5G (192.168.56.40)
 | --- | --- | --- |
 | 1 | Structure du dépôt, environnement Python | fait |
 | 2 | Serveur MCP minimal (outil `etat_reseau`) | fait |
-| 3 | Appel au LLM local (Ollama) | en cours |
-| 4 | Agent minimal : LLM + outil MCP | à faire |
+| 3 | Appel au LLM local (Ollama) | fait |
+| 4 | Agent minimal : LLM + outil MCP | en cours |
 | 5 | Outils d'enquête : historique, événements, journaux | à faire |
 | 6 | RAG : base de connaissances 5G / NWDAF | à faire |
 | 7 | Évaluation sur les campagnes de pannes | à faire |
@@ -86,3 +86,15 @@ python agent/tester_llm.py             # question simple + mesure de vitesse
 python agent/tester_llm.py qwen2.5:3b
 ```
 `agent/ollama_local.py` appelle l'API HTTP d'Ollama (`/api/chat`, `/api/embed`) sans bibliothèque externe.
+
+Mesures sur le PC (Core Ultra 7 258V, 31 Go, processeur seul) : qwen2.5:7b ≈ 9 tokens/s, qwen2.5:3b ≈ 19 tokens/s.
+
+## Agent
+
+```powershell
+python agent/agent.py "Que se passe-t-il sur le réseau ?"
+python agent/agent.py "Diagnostique le réseau" --instant 2026-11-26T01:53:30Z   # rejoue un instant passé
+python agent/agent.py "Diagnostique le réseau" --modele qwen2.5:3b
+```
+Boucle : le LLM reçoit la question et le menu des outils MCP ; il demande un outil, l'agent l'exécute sur
+le serveur MCP et lui renvoie le résultat ; jusqu'à la réponse finale. Le LLM ne touche jamais le réseau.
