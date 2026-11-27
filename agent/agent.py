@@ -16,6 +16,7 @@ Le LLM ne touche jamais le réseau lui-même : il ne fait que demander ; c'est l
 import argparse
 import asyncio
 import json
+import re
 import sys
 import time
 
@@ -25,6 +26,7 @@ from ollama_local import discuter
 
 MCP_URL = "http://192.168.56.40:8765/mcp"
 MAX_ETAPES = 8
+MAX_APPELS = 5               # budget d'appels d'outils ; ensuite, réponse finale obligatoire
 TAILLE_MAX_RESULTAT = 3500   # caractères d'un résultat d'outil transmis au LLM (sa mémoire est limitée)
 
 SYSTEME = """Tu es l'agent de diagnostic d'un réseau 5G de test (cœur free5GC, NWDAF, 4 gNB, 4 UE).
@@ -47,6 +49,19 @@ Réponse finale avec ces rubriques :
 - Cause probable et élément touché.
 - Confiance : élevée, moyenne ou faible.
 - Actions recommandées."""
+
+
+def appels_ecrits_en_texte(texte: str, noms: set) -> list:
+    """Rattrapage : un petit modèle écrit parfois sa demande d'outil dans le texte, par exemple
+    {"name": "journaux_ran", "arguments": {...}}, au lieu du format prévu. On la reconnaît quand même."""
+    appels = []
+    for m in re.finditer(r'\{\s*"name"\s*:\s*"(\w+)"\s*,\s*"arguments"\s*:\s*(\{[^{}]*\})\s*\}', texte or ""):
+        if m.group(1) in noms:
+            try:
+                appels.append({"function": {"name": m.group(1), "arguments": json.loads(m.group(2))}})
+            except json.JSONDecodeError:
+                pass
+    return appels
 
 
 def outil_pour_ollama(outil) -> dict:
@@ -74,10 +89,19 @@ async def diagnostiquer(question: str, modele: str, instant: str | None = None) 
         outils = [outil_pour_ollama(o) for o in (await client.list_tools()).tools]
         print(f"Outils disponibles : {', '.join(o['function']['name'] for o in outils)}")
 
+        noms = {o["function"]["name"] for o in outils}
+        nb_appels = 0
         for etape in range(1, MAX_ETAPES + 1):
             debut = time.time()
+            if nb_appels >= MAX_APPELS:      # budget épuisé : plus d'outils, le modèle doit conclure
+                messages.append({"role": "user", "content": "Tu as assez d'informations. Donne maintenant ta "
+                                 "réponse finale avec les rubriques demandées, sans appeler d'outil."})
+                return discuter(modele, messages)["message"].get("content", "")
             message = discuter(modele, messages, outils)["message"]          # le LLM réfléchit
-            appels = message.get("tool_calls") or []
+            appels = message.get("tool_calls") or appels_ecrits_en_texte(message.get("content", ""), noms)
+            if appels and not message.get("tool_calls"):
+                print("  (demande d'outil écrite en texte : reconnue par le rattrapage)")
+                message = {"role": "assistant", "content": "", "tool_calls": appels}
             print(f"\n[tour {etape}] réponse du LLM en {time.time() - debut:.1f} s : "
                   f"{'demande ' + str(len(appels)) + ' outil(s)' if appels else 'réponse finale'}")
             messages.append(message)
@@ -101,6 +125,7 @@ async def diagnostiquer(question: str, modele: str, instant: str | None = None) 
                     texte = texte[:TAILLE_MAX_RESULTAT] + " …(tronqué)"
                 print(f"     résultat : {len(texte)} caractères renvoyés au LLM")
                 messages.append({"role": "tool", "content": texte, "tool_name": nom})
+                nb_appels += 1
 
         messages.append({"role": "user", "content": "Donne maintenant ta réponse finale."})
         return discuter(modele, messages)["message"].get("content", "")
