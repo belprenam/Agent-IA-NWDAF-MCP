@@ -47,8 +47,8 @@ PC Windows                                        VM du cœur 5G (192.168.56.40)
 
 | Brique | Contenu | État |
 | --- | --- | --- |
-| 1 | Structure du dépôt, environnement Python | en cours |
-| 2 | Serveur MCP minimal (outil `etat_reseau`) | à faire |
+| 1 | Structure du dépôt, environnement Python | fait |
+| 2 | Serveur MCP minimal (outil `etat_reseau`) | en cours |
 | 3 | Appel au LLM local (Ollama) | à faire |
 | 4 | Agent minimal : LLM + outil MCP | à faire |
 | 5 | Outils d'enquête : historique, événements, journaux | à faire |
@@ -66,3 +66,13 @@ PC Windows                                        VM du cœur 5G (192.168.56.40)
    .venv\Scripts\Activate.ps1
    pip install -r requirements.txt
    ```
+   Si `python` ouvre le Microsoft Store, utiliser `py -m venv .venv` (lanceur Python de Windows).
+
+## Serveur MCP (VM du cœur)
+
+```bash
+git clone https://github.com/belprenam/Agent-IA-NWDAF-MCP ~/Agent-IA-NWDAF-MCP   # ou git pull
+bash ~/Agent-IA-NWDAF-MCP/serveur-mcp/installer.sh        # une seule fois
+bash ~/Agent-IA-NWDAF-MCP/serveur-mcp/demarrer.sh         # --redemarrer après une mise à jour
+```
+Test depuis Windows : `python agent/tester_mcp.py` (liste les outils et appelle `etat_reseau`).
