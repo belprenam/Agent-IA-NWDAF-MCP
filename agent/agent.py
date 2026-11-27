@@ -25,7 +25,7 @@ from mcp import Client
 from ollama_local import discuter
 
 MCP_URL = "http://192.168.56.40:8765/mcp"
-MAX_ETAPES = 8
+MAX_ETAPES = 10
 MAX_APPELS = 5               # budget d'appels d'outils ; ensuite, réponse finale obligatoire
 TAILLE_MAX_RESULTAT = 3500   # caractères d'un résultat d'outil transmis au LLM (sa mémoire est limitée)
 
@@ -91,6 +91,7 @@ async def diagnostiquer(question: str, modele: str, instant: str | None = None) 
 
         noms = {o["function"]["name"] for o in outils}
         nb_appels = 0
+        relances = 0
         for etape in range(1, MAX_ETAPES + 1):
             debut = time.time()
             if nb_appels >= MAX_APPELS:      # budget épuisé : plus d'outils, le modèle doit conclure
@@ -106,10 +107,20 @@ async def diagnostiquer(question: str, modele: str, instant: str | None = None) 
                   f"{'demande ' + str(len(appels)) + ' outil(s)' if appels else 'réponse finale'}")
             messages.append(message)
             if not appels:
-                if etape == 1:      # un petit modèle répond parfois sans regarder : on insiste une fois
+                texte = (message.get("content") or "").strip()
+                if nb_appels == 0 and relances < 2:   # répond sans avoir rien observé : on insiste
+                    relances += 1
+                    print("  (aucun outil appelé : on demande d'observer d'abord)")
                     messages.append({"role": "user", "content": "Observe d'abord le réseau : appelle etat_reseau."})
                     continue
-                return message.get("content", "")
+                if "résumé" not in texte.lower() and relances < 2:   # réponse vide ou hors format
+                    relances += 1
+                    print(f"  (réponse {'vide' if not texte else 'sans les rubriques'} : on relance le modèle)")
+                    messages.append({"role": "user", "content": "Ta réponse est vide ou incomplète. Si tu as besoin "
+                                     "d'une information, appelle un outil ; sinon donne ta réponse finale avec les "
+                                     "rubriques Résumé, Observations, Cause probable, Confiance, Actions recommandées."})
+                    continue
+                return texte
 
             for appel in appels:                                              # l'agent exécute
                 nom = appel["function"]["name"]
