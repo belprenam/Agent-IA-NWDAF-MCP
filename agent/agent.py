@@ -24,19 +24,28 @@ from mcp import Client
 from ollama_local import discuter
 
 MCP_URL = "http://192.168.56.40:8765/mcp"
-MAX_ETAPES = 6
+MAX_ETAPES = 8
+TAILLE_MAX_RESULTAT = 3500   # caractères d'un résultat d'outil transmis au LLM (sa mémoire est limitée)
 
 SYSTEME = """Tu es l'agent de diagnostic d'un réseau 5G de test (cœur free5GC, NWDAF, 4 gNB, 4 UE).
-Tu réponds en français. Tu observes le réseau uniquement à l'aide des outils fournis :
-appelle d'abord etat_reseau, puis raisonne sur les valeurs obtenues. N'invente aucune valeur.
+Tu réponds en français. Tu observes le réseau uniquement à l'aide des outils fournis. N'invente aucune valeur.
 
-Rappel : le NWDAF voit la signalisation (enregistrement, session) ; la sonde côté UE voit le trafic réel
-(trafic_ok = 1 si une requête HTTPS passe). Comparer les deux vues aide à trouver la panne.
+Méthode :
+1. Photo : appelle etat_reseau. Repère ce qui s'écarte de la normale (UE non enregistrés, sessions manquantes,
+   trafic en échec, latence élevée, cibles injoignables).
+2. Compare les vues : le NWDAF voit la signalisation (enregistrement, session) ; la sonde côté UE voit le trafic
+   réel (trafic_ok = 1 si une requête HTTPS passe par UE -> gNB -> UPF -> Internet).
+3. Dynamique : si c'est anormal, appelle evenements_reseau et historique_indicateur pour savoir depuis quand,
+   et si un seul UE ou tous sont touchés.
+4. Confirmation : journaux_coeur (AMF pour les gNB et les enregistrements, SMF pour les sessions, UPF pour le
+   plan usager) ou journaux_ran (un gNB ou un UE précis).
+5. Conclus. Pas plus de 6 appels d'outils ; si tout est normal, dis-le.
 
 Réponse finale avec ces rubriques :
 - Résumé : une phrase.
-- Observations : les valeurs qui comptent.
+- Observations : les valeurs et heures qui comptent.
 - Cause probable et élément touché.
+- Confiance : élevée, moyenne ou faible.
 - Actions recommandées."""
 
 
@@ -73,6 +82,9 @@ async def diagnostiquer(question: str, modele: str, instant: str | None = None) 
                   f"{'demande ' + str(len(appels)) + ' outil(s)' if appels else 'réponse finale'}")
             messages.append(message)
             if not appels:
+                if etape == 1:      # un petit modèle répond parfois sans regarder : on insiste une fois
+                    messages.append({"role": "user", "content": "Observe d'abord le réseau : appelle etat_reseau."})
+                    continue
                 return message.get("content", "")
 
             for appel in appels:                                              # l'agent exécute
@@ -85,6 +97,8 @@ async def diagnostiquer(question: str, modele: str, instant: str | None = None) 
                 print(f"  -> outil {nom}({json.dumps(arguments, ensure_ascii=False)})")
                 resultat = await client.call_tool(nom, arguments)
                 texte = "\n".join(getattr(c, "text", "") for c in resultat.content)
+                if len(texte) > TAILLE_MAX_RESULTAT:
+                    texte = texte[:TAILLE_MAX_RESULTAT] + " …(tronqué)"
                 print(f"     résultat : {len(texte)} caractères renvoyés au LLM")
                 messages.append({"role": "tool", "content": texte, "tool_name": nom})
 

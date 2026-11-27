@@ -50,8 +50,8 @@ PC Windows                                        VM du cœur 5G (192.168.56.40)
 | 1 | Structure du dépôt, environnement Python | fait |
 | 2 | Serveur MCP minimal (outil `etat_reseau`) | fait |
 | 3 | Appel au LLM local (Ollama) | fait |
-| 4 | Agent minimal : LLM + outil MCP | en cours |
-| 5 | Outils d'enquête : historique, événements, journaux | à faire |
+| 4 | Agent minimal : LLM + outil MCP | fait |
+| 5 | Outils d'enquête : historique, événements, journaux | en cours |
 | 6 | RAG : base de connaissances 5G / NWDAF | à faire |
 | 7 | Évaluation sur les campagnes de pannes | à faire |
 
@@ -76,6 +76,17 @@ bash ~/Agent-IA-NWDAF-MCP/serveur-mcp/installer.sh        # une seule fois
 bash ~/Agent-IA-NWDAF-MCP/serveur-mcp/demarrer.sh         # --redemarrer après une mise à jour
 ```
 Test depuis Windows : `python agent/tester_mcp.py` (liste les outils et appelle `etat_reseau`).
+
+| Outil MCP (lecture seule) | Rôle |
+| --- | --- |
+| `etat_reseau` | Photo du réseau : chaque UE vu par le NWDAF et par la sonde, sessions, cellule, trafic, cibles, VM |
+| `historique_indicateur` | Évolution d'un indicateur sur une fenêtre (19 indicateurs nommés) |
+| `evenements_reseau` | Enregistrements, sessions PDU et changements de cellule reçus par le NWDAF |
+| `journaux_coeur` | Avertissements et erreurs de free5GC (AMF, SMF, UPF…), regroupés |
+| `journaux_ran` | Erreurs d'un gNB ou d'un UE UERANSIM (lues par SSH) |
+| `requete_promql` | Requête PromQL libre |
+
+Tous acceptent `instant` (UTC) pour rejouer un moment passé.
 
 ## LLM local (Windows)
 
